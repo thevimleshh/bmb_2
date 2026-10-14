@@ -1,0 +1,6 @@
+{
+  "name": "BMB - Book My Bus",
+  "description": "Full-stack bus ticket reservation platform with live seat locking, Razorpay payments, PDF e-tickets, and live GPS tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
