@@ -125,6 +125,8 @@ function AppContent() {
     contactPhone: string;
     couponCode: string;
     discountAmount: number;
+    redeemedPoints: number;
+    pointsEarned: number;
     finalAmount: number;
   }) => {
     setRazorpayModalData({
@@ -134,6 +136,8 @@ function AppContent() {
       passengers: data.passengers,
       couponCode: data.couponCode,
       discountAmount: data.discountAmount,
+      redeemedPoints: data.redeemedPoints,
+      pointsEarned: data.pointsEarned,
       finalAmount: data.finalAmount,
     });
   };

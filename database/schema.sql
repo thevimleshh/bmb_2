@@ -177,7 +177,9 @@ INSERT INTO routes (id, from_city, to_city, distance_km, estimated_duration_hour
 (5, 'Delhi', 'Jaipur', 280, 5.0),
 (6, 'Jaipur', 'Delhi', 280, 5.0),
 (7, 'Hyderabad', 'Bangalore', 570, 8.5),
-(8, 'Bangalore', 'Hyderabad', 570, 8.5);
+(8, 'Bangalore', 'Hyderabad', 570, 8.5),
+(9, 'Mumbai', 'Bangalore', 985, 15.0),
+(10, 'Bangalore', 'Mumbai', 985, 15.0);
 
 -- Daily Schedules (Current and upcoming dates)
 INSERT INTO schedules (id, bus_id, route_id, departure_time, arrival_time, journey_date, base_price) VALUES
@@ -188,7 +190,10 @@ INSERT INTO schedules (id, bus_id, route_id, departure_time, arrival_time, journ
 (5, 4, 3, '21:00:00', '03:00:00', CURDATE(), 1150.00),
 (6, 3, 5, '06:00:00', '11:00:00', CURDATE(), 699.00),
 (7, 1, 5, '23:00:00', '04:00:00', CURDATE(), 950.00),
-(8, 4, 7, '20:30:00', '05:00:00', CURDATE(), 1299.00);
+(8, 4, 7, '20:30:00', '05:00:00', CURDATE(), 1299.00),
+(9, 4, 9, '18:30:00', '09:30:00', CURDATE(), 1599.00),
+(10, 2, 9, '20:30:00', '12:30:00', CURDATE(), 1350.00),
+(11, 1, 10, '17:00:00', '08:30:00', CURDATE(), 1499.00);
 
 -- Boarding & Dropping Points for Schedule 1 (Mumbai to Pune - Morning)
 INSERT INTO boarding_dropping_points (schedule_id, point_type, location_name, landmark, address, scheduled_time) VALUES
@@ -254,6 +259,24 @@ INSERT INTO boarding_dropping_points (schedule_id, point_type, location_name, la
 (8, 'BOARDING', 'Shamshabad', 'Airport Approach Junction', 'Bangalore Highway, Shamshabad, Hyderabad', '22:00:00'),
 (8, 'DROPPING', 'Hebbal Flyover', 'Near Esteem Mall', 'Bellary Road, Hebbal, Bangalore', '04:00:00'),
 (8, 'DROPPING', 'Majestic Metro Station', 'Terminal Exit Gate 2', 'Subhash Nagar, Central Bus Stand, Bangalore', '05:00:00');
+
+-- Boarding & Dropping Points for Schedule 9 (Mumbai to Bangalore - Orange BharatBenz)
+INSERT INTO boarding_dropping_points (schedule_id, point_type, location_name, landmark, address, scheduled_time) VALUES
+(9, 'BOARDING', 'Borivali West', 'Near Gokul Hotel', 'Western Express Highway, Borivali West, Mumbai', '18:30:00'),
+(9, 'BOARDING', 'Andheri East', 'Bisleri Flyover Bridge', 'WEH Metro Station Junction, Andheri East, Mumbai', '19:00:00'),
+(9, 'BOARDING', 'Dadar East', 'Near Swami Narayan Temple', 'Asiad Bus Terminal, Dadar TT Circle, Mumbai', '19:30:00'),
+(9, 'BOARDING', 'Vashi Toll Plaza', 'Below Highway Bridge', 'Sector 17, Vashi, Navi Mumbai', '20:15:00'),
+(9, 'DROPPING', 'Hebbal Flyover', 'Near Esteem Mall', 'Bellary Road, Hebbal, Bangalore', '08:30:00'),
+(9, 'DROPPING', 'Majestic Metro Station', 'Terminal Exit Gate 2', 'Subhash Nagar, Central Bus Stand, Bangalore', '09:00:00'),
+(9, 'DROPPING', 'Electronic City Toll', 'Elevated Highway Ramp', 'Hosur Main Road, Electronic City Phase 1, Bangalore', '09:30:00');
+
+-- Boarding & Dropping Points for Schedule 10 (Mumbai to Bangalore - KSRTC Volvo)
+INSERT INTO boarding_dropping_points (schedule_id, point_type, location_name, landmark, address, scheduled_time) VALUES
+(10, 'BOARDING', 'Borivali West', 'Near Gokul Hotel', 'Western Express Highway, Borivali West, Mumbai', '20:30:00'),
+(10, 'BOARDING', 'Dadar East', 'Near Swami Narayan Temple', 'Asiad Bus Terminal, Dadar TT Circle, Mumbai', '21:15:00'),
+(10, 'BOARDING', 'Vashi Toll Plaza', 'Below Highway Bridge', 'Sector 17, Vashi, Navi Mumbai', '22:00:00'),
+(10, 'DROPPING', 'Anand Rao Circle', 'Private Bus Bay', 'Sheshadri Road, Gandhi Nagar, Bangalore', '12:00:00'),
+(10, 'DROPPING', 'Electronic City Toll', 'Elevated Highway Ramp', 'Hosur Main Road, Electronic City Phase 1, Bangalore', '12:30:00');
 
 -- Pre-seed Seat Inventory for Schedule 1 (Lower and Upper Deck)
 INSERT INTO seat_inventory (schedule_id, seat_number, deck, seat_type, is_window, price, status) VALUES

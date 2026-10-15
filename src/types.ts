@@ -1,15 +1,29 @@
+export interface LocationItem {
+  id: string | number;
+  name: string;
+  city: string;
+  state: string;
+  type: 'TERMINAL' | 'MAJOR_HUB' | 'AIRPORT' | 'RAILWAY_STATION' | 'LOCALITY' | 'CITY';
+  address?: string;
+  tag?: string;
+  lat?: number;
+  lng?: number;
+}
+
 export interface User {
   id: number;
   name: string;
   email: string;
   phone: string;
   role: 'ROLE_USER' | 'ROLE_ADMIN';
+  loyaltyPoints?: number;
 }
 
 export interface Bus {
   id: number;
   busNumber: string;
   operatorName: string;
+  busName?: string;
   busType: string;
   totalSeats: number;
   hasWifi: boolean;
@@ -17,6 +31,8 @@ export interface Bus {
   hasBlanket: boolean;
   hasWaterBottle: boolean;
   hasEmergencyExit: boolean;
+  hasGpsDevice?: boolean;
+  busImage?: string;
   rating: number;
   isActive: boolean;
 }
@@ -29,6 +45,8 @@ export interface BoardingPoint {
   landmark: string;
   address?: string;
   time: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface Schedule {
@@ -46,6 +64,10 @@ export interface Schedule {
   boardingPoints?: BoardingPoint[];
   droppingPoints?: BoardingPoint[];
   availableSeats?: number;
+  intermediateStops?: string[];
+  isActive?: boolean;
+  fromCoords?: { lat: number; lng: number };
+  toCoords?: { lat: number; lng: number };
 }
 
 export interface SeatItem {
@@ -86,6 +108,8 @@ export interface Booking {
   bookingStatus: 'CONFIRMED' | 'CANCELLED';
   bookingDate: string;
   passengers: Passenger[];
+  pointsEarned?: number;
+  pointsRedeemed?: number;
   cancellation?: {
     reason: string;
     refundPercentage: number;
@@ -106,7 +130,9 @@ export interface TrackingData {
   scheduleId: number;
   busNumber: string;
   operatorName: string;
-  currentLocation: {
+  available?: boolean;
+  statusMessage?: string;
+  currentLocation?: {
     lat: number;
     lng: number;
     landmark: string;
@@ -127,3 +153,4 @@ export interface Offer {
   discount: string;
   terms: string;
 }
+

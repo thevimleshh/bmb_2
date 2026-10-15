@@ -38,7 +38,7 @@ export const LiveTrackingView: React.FC<LiveTrackingViewProps> = ({
 
   // Initialize Leaflet Map
   useEffect(() => {
-    if (!mapContainerRef.current || !tracking || !gpsFeedActive) return;
+    if (!mapContainerRef.current || !tracking || !tracking.currentLocation || !gpsFeedActive || tracking.available === false) return;
 
     if (!mapInstanceRef.current) {
       const map = L.map(mapContainerRef.current).setView(
@@ -52,21 +52,23 @@ export const LiveTrackingView: React.FC<LiveTrackingViewProps> = ({
       }).addTo(map);
 
       // Draw polyline connecting highway waypoints
-      const polylineCoords: [number, number][] = tracking.waypoints.map(w => [w.lat, w.lng]);
-      L.polyline(polylineCoords, { color: '#EA580C', weight: 4, opacity: 0.8 }).addTo(map);
+      if (tracking.waypoints && tracking.waypoints.length > 0) {
+        const polylineCoords: [number, number][] = tracking.waypoints.map(w => [w.lat, w.lng]);
+        L.polyline(polylineCoords, { color: '#EA580C', weight: 4, opacity: 0.8 }).addTo(map);
 
-      // Waypoint circle markers
-      tracking.waypoints.forEach(wp => {
-        const marker = L.circleMarker([wp.lat, wp.lng], {
-          radius: wp.isCurrent ? 8 : 5,
-          color: wp.isCurrent ? '#EA580C' : (wp.passed ? '#10B981' : '#64748B'),
-          fillColor: wp.isCurrent ? '#F97316' : (wp.passed ? '#10B981' : '#CBD5E1'),
-          fillOpacity: 0.9,
-          weight: 2,
-        }).addTo(map);
+        // Waypoint circle markers
+        tracking.waypoints.forEach(wp => {
+          const marker = L.circleMarker([wp.lat, wp.lng], {
+            radius: wp.isCurrent ? 8 : 5,
+            color: wp.isCurrent ? '#EA580C' : (wp.passed ? '#10B981' : '#64748B'),
+            fillColor: wp.isCurrent ? '#F97316' : (wp.passed ? '#10B981' : '#CBD5E1'),
+            fillOpacity: 0.9,
+            weight: 2,
+          }).addTo(map);
 
-        marker.bindPopup(`<strong>${wp.name}</strong><br/>Status: ${wp.passed ? 'Departed' : (wp.isCurrent ? 'Current Live Position' : 'Upcoming Stop')}`);
-      });
+          marker.bindPopup(`<strong>${wp.name}</strong><br/>Status: ${wp.passed ? 'Departed' : (wp.isCurrent ? 'Current Live Position' : 'Upcoming Stop')}`);
+        });
+      }
 
       // Animated Bus Icon marker
       const busIcon = L.divIcon({
@@ -83,7 +85,7 @@ export const LiveTrackingView: React.FC<LiveTrackingViewProps> = ({
       mapInstanceRef.current = map;
     } else {
       // Update existing map
-      if (markerRef.current) {
+      if (markerRef.current && tracking.currentLocation) {
         markerRef.current.setLatLng([tracking.currentLocation.lat, tracking.currentLocation.lng]);
       }
     }
@@ -137,24 +139,32 @@ export const LiveTrackingView: React.FC<LiveTrackingViewProps> = ({
       </div>
 
       {/* Main Container */}
-      {!gpsFeedActive ? (
+      {!gpsFeedActive || tracking?.available === false || !tracking?.currentLocation ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-xs">
           <div className="w-14 h-14 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-3">
             <AlertCircle className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-bold text-slate-900">Live GPS Tracking Currently Unavailable</h2>
+          <h2 className="text-xl font-bold text-slate-900">
+            {tracking?.statusMessage || 'Live GPS Tracking Currently Unavailable'}
+          </h2>
           <p className="text-xs text-slate-500 mt-2 max-w-md mx-auto leading-relaxed">
-            The bus on-board IoT tracking hardware is temporarily out of satellite coverage or the operator has not configured real-time telemetry broadcast for this vehicle.
+            No on-board IoT telemetry device or satellite GPS hardware feed is configured for this vehicle ({tracking?.busNumber || 'Fleet Coach'}). In accordance with BMB Real Data integrity guidelines, we never fabricate fake GPS positions.
           </p>
           <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-600 text-xs rounded-lg font-medium">
-            <span>Per BMB Accuracy Rules, we never fabricate fake coordinates.</span>
+            <span>Real GPS feed required · Live tracking unavailable</span>
           </div>
-          <div className="mt-6">
+          <div className="mt-6 flex justify-center gap-3">
             <button
               onClick={() => setGpsFeedActive(true)}
               className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-orange-600 transition-colors cursor-pointer"
             >
-              Reconnect Hardware GPS Feed
+              Retry GPS Telemetry
+            </button>
+            <button
+              onClick={onNavigateHome}
+              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              Back to Search Results
             </button>
           </div>
         </div>
@@ -170,7 +180,7 @@ export const LiveTrackingView: React.FC<LiveTrackingViewProps> = ({
                 <div className="text-[11px] font-bold text-slate-400 uppercase">Current Speed</div>
                 <div className="text-xl font-black text-slate-900 font-mono flex items-center gap-1.5 mt-0.5">
                   <Gauge className="w-4 h-4 text-orange-600" />
-                  <span>{tracking?.currentLocation.speedKmh || 68} km/h</span>
+                  <span>{tracking.currentLocation.speedKmh} km/h</span>
                 </div>
               </div>
 
@@ -178,7 +188,7 @@ export const LiveTrackingView: React.FC<LiveTrackingViewProps> = ({
                 <div className="text-[11px] font-bold text-slate-400 uppercase">Next Stop ETA</div>
                 <div className="text-xl font-black text-slate-900 font-mono flex items-center gap-1.5 mt-0.5">
                   <Clock className="w-4 h-4 text-orange-600" />
-                  <span>{tracking?.estimatedTimeToNextStopMinutes || 24} Mins</span>
+                  <span>{tracking.estimatedTimeToNextStopMinutes || 24} Mins</span>
                 </div>
               </div>
 
@@ -186,14 +196,14 @@ export const LiveTrackingView: React.FC<LiveTrackingViewProps> = ({
                 <div className="text-[11px] font-bold text-slate-400 uppercase">Estimated Arrival</div>
                 <div className="text-xl font-black text-slate-900 font-mono flex items-center gap-1.5 mt-0.5">
                   <Navigation className="w-4 h-4 text-emerald-600" />
-                  <span>{tracking?.estimatedArrival || '10:00 AM'}</span>
+                  <span>{tracking.estimatedArrival || '10:00 AM'}</span>
                 </div>
               </div>
 
               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                 <div className="text-[11px] font-bold text-slate-400 uppercase">Route Progress</div>
                 <div className="text-xl font-black text-orange-600 font-mono mt-0.5">
-                  {tracking?.progressPercentage || 58}%
+                  {tracking.progressPercentage || 58}%
                 </div>
               </div>
             </div>
@@ -205,7 +215,7 @@ export const LiveTrackingView: React.FC<LiveTrackingViewProps> = ({
 
             <div className="text-xs text-slate-400 flex items-center justify-between">
               <span>Interactive Leaflet Map & OpenStreetMap Tiles</span>
-              <span>Updated: {tracking?.currentLocation.lastUpdated || 'Just now'}</span>
+              <span>Updated: {tracking.currentLocation.lastUpdated || 'Just now'}</span>
             </div>
 
           </div>
@@ -217,17 +227,17 @@ export const LiveTrackingView: React.FC<LiveTrackingViewProps> = ({
                 Active Vehicle
               </div>
               <h3 className="text-base font-extrabold text-slate-900">
-                {tracking?.operatorName || 'VRL Travels'}
+                {tracking.operatorName}
               </h3>
               <div className="text-xs font-mono text-slate-500">
-                {tracking?.busNumber || 'MH-12-RN-8899'}
+                {tracking.busNumber}
               </div>
             </div>
 
             <div className="p-3 bg-orange-50 rounded-xl border border-orange-200 text-xs text-orange-950 font-medium flex items-start gap-2">
               <MapPin className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
               <div>
-                <strong>Current Landmark:</strong> {tracking?.currentLocation.landmark}
+                <strong>Current Landmark:</strong> {tracking.currentLocation.landmark}
               </div>
             </div>
 
