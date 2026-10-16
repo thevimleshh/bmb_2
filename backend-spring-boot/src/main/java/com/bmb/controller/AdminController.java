@@ -264,10 +264,10 @@ public class AdminController {
                             : 350);
 
             route.setEstimatedDurationHours(
-                    body.get("durationHours") != null
-                            ? BigDecimal.valueOf(
-                                    ((Number) body.get("durationHours")).doubleValue())
-                            : BigDecimal.valueOf(6.0));
+        body.get("durationHours") != null
+                ? ((Number) body.get("durationHours")).doubleValue()
+                : 6.0
+);
 
             route = routeRepository.save(route);
         }

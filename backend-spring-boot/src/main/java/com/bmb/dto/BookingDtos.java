@@ -1,10 +1,13 @@
 package com.bmb.dto;
 
 import lombok.Data;
-import java.math.BigDecimal;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
 import java.util.List;
 
 public class BookingDtos {
+
     @Data
     public static class SeatLockRequest {
         private Long scheduleId;
@@ -12,6 +15,8 @@ public class BookingDtos {
     }
 
     @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class SeatLockResponse {
         private boolean success;
         private String message;
