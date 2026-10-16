@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import { HeroSearch } from './components/HeroSearch';
@@ -18,20 +19,33 @@ import { Footer } from './components/Footer';
 import { Schedule, SeatItem, BoardingPoint, Passenger, Booking } from './types';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
+const API_BASE_URL = 'https://bmb-22.onrender.com';
+
 function AppContent() {
-  const { user, updateLoyaltyPoints } = useAuth();
+  const { user } = useAuth();
+
   const [currentTab, setCurrentTab] = useState<string>('home');
 
   // Search parameters
   const [fromCity, setFromCity] = useState<string>('Mumbai');
   const [toCity, setToCity] = useState<string>('Pune');
-  const [journeyDate, setJourneyDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [journeyDate, setJourneyDate] = useState<string>(
+    () => {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+  );
   const [passengerCount, setPassengerCount] = useState<number>(1);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loadingBuses, setLoadingBuses] = useState<boolean>(false);
 
   // Active modal targets
-  const [activeSeatModalSchedule, setActiveSeatModalSchedule] = useState<Schedule | null>(null);
+  const [activeSeatModalSchedule, setActiveSeatModalSchedule] =
+    useState<Schedule | null>(null);
+
   const [passengerModalData, setPassengerModalData] = useState<{
     selectedSeats: SeatItem[];
     boardingPoint: BoardingPoint;
@@ -52,50 +66,130 @@ function AppContent() {
     finalAmount: number;
   } | null>(null);
 
-  const [ticketSuccessBooking, setTicketSuccessBooking] = useState<Booking | null>(null);
-  const [cancellationBooking, setCancellationBooking] = useState<Booking | null>(null);
+  const [ticketSuccessBooking, setTicketSuccessBooking] =
+    useState<Booking | null>(null);
+
+  const [cancellationBooking, setCancellationBooking] =
+    useState<Booking | null>(null);
+
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
 
   // Live tracking target
   const [trackingScheduleId, setTrackingScheduleId] = useState<number>(1);
 
   // Toast feedback
-  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [toastMessage, setToastMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
 
-  const showToast = (text: string, type: 'success' | 'error' = 'success') => {
-    setToastMessage({ text, type });
-    setTimeout(() => setToastMessage(null), 4000);
-  };
+  const showToast = useCallback(
+    (text: string, type: 'success' | 'error' = 'success') => {
+      setToastMessage({ text, type });
+      window.setTimeout(() => {
+        setToastMessage(current =>
+          current?.text === text ? null : current
+        );
+      }, 4000);
+    },
+    []
+  );
 
-  // Unique session ID for concurrency hold tracking
+  // Unique session ID for seat-lock tracking
   const [sessionId] = useState<string>(() => {
-    let sid = sessionStorage.getItem('bmb_session_id');
-    if (!sid) {
-      sid = 'session_' + Math.random().toString(36).substring(2, 12);
-      sessionStorage.setItem('bmb_session_id', sid);
+    try {
+      let sid = sessionStorage.getItem('bmb_session_id');
+
+      if (!sid) {
+        sid =
+          'session_' +
+          Math.random().toString(36).substring(2, 12);
+
+        sessionStorage.setItem('bmb_session_id', sid);
+      }
+
+      return sid;
+    } catch {
+      return (
+        'session_' +
+        Math.random().toString(36).substring(2, 12)
+      );
     }
-    return sid;
   });
 
-  // Fetch buses matching search criteria
-  const handleSearchBuses = async () => {
+  // Search buses from the deployed Spring Boot backend
+  const handleSearchBuses = useCallback(async () => {
+    if (!fromCity.trim() || !toCity.trim() || !journeyDate) {
+      showToast('Please select starting city, destination and date.', 'error');
+      return;
+    }
+
+    if (
+      fromCity.trim().toLowerCase() ===
+      toCity.trim().toLowerCase()
+    ) {
+      showToast('Starting city and destination cannot be the same.', 'error');
+      return;
+    }
+
     setLoadingBuses(true);
     setCurrentTab('home');
+
     try {
-      const res = await fetch(`/api/buses/search?from=${encodeURIComponent(fromCity)}&to=${encodeURIComponent(toCity)}&date=${journeyDate}`);
-      const data = await res.json();
-      setSchedules(data || []);
-      setLoadingBuses(false);
-    } catch {
-      showToast('Error searching buses. Please check connection.', 'error');
+      const params = new URLSearchParams({
+        from: fromCity.trim(),
+        to: toCity.trim(),
+        date: journeyDate,
+      });
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/buses/search?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        throw new Error(
+          `Bus search failed (${response.status}). ${errorText.slice(0, 180)}`
+        );
+      }
+
+      const data = await response.json();
+
+      if (!Array.isArray(data)) {
+        throw new Error('Backend returned an unexpected bus-search response.');
+      }
+
+      setSchedules(data);
+
+      if (data.length === 0) {
+        showToast('No buses found for this route and date.', 'error');
+      }
+    } catch (error) {
+      console.error('BMB bus search error:', error);
+      setSchedules([]);
+
+      const message =
+        error instanceof Error ? error.message : 'Unknown network error';
+
+      showToast(
+        `Unable to load buses. ${message}. Check backend status and CORS settings.`,
+        'error'
+      );
+    } finally {
       setLoadingBuses(false);
     }
-  };
+  }, [fromCity, toCity, journeyDate, showToast]);
 
-  // Initial load
+  // Initial bus search
   useEffect(() => {
-    handleSearchBuses();
-  }, []);
+    void handleSearchBuses();
+  }, []); // Intentionally run once when the app first loads.
 
   const handleSelectSeats = (schedule: Schedule) => {
     setActiveSeatModalSchedule(schedule);
@@ -107,7 +201,7 @@ function AppContent() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Transition from Seat Selection to Passenger Form
+  // Seat selection -> passenger details
   const handleProceedToPassengerDetails = (data: {
     selectedSeats: SeatItem[];
     boardingPoint: BoardingPoint;
@@ -118,7 +212,7 @@ function AppContent() {
     setPassengerModalData(data);
   };
 
-  // Transition from Passenger Form to Razorpay Payment
+  // Passenger details -> payment
   const handleProceedToPayment = (data: {
     passengers: Passenger[];
     contactEmail: string;
@@ -142,60 +236,112 @@ function AppContent() {
     });
   };
 
-  // Final verification with backend after payment success
+  // Verify payment and confirm booking on the backend
   const handlePaymentSuccess = async (paymentDetails: {
     paymentId: string;
     orderId: string;
     signature: string;
   }) => {
-    if (!activeSeatModalSchedule || !passengerModalData || !razorpayModalData) return;
+    if (
+      !activeSeatModalSchedule ||
+      !passengerModalData ||
+      !razorpayModalData
+    ) {
+      showToast('Booking details are missing. Please try again.', 'error');
+      return;
+    }
 
     try {
-      const res = await fetch('/api/bookings/verify-and-confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scheduleId: activeSeatModalSchedule.id,
-          boardingPoint: `${passengerModalData.boardingPoint.locationName} (${passengerModalData.boardingPoint.time})`,
-          droppingPoint: `${passengerModalData.droppingPoint.locationName} (${passengerModalData.droppingPoint.time})`,
-          passengers: razorpayModalData.passengers,
-          couponCode: razorpayModalData.couponCode,
-          paymentId: paymentDetails.paymentId,
-          orderId: paymentDetails.orderId,
-          signature: paymentDetails.signature,
-          sessionId,
-          userEmail: razorpayModalData.customerEmail,
-          userName: razorpayModalData.passengers[0]?.name,
-          userPhone: razorpayModalData.customerPhone,
-        }),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/bookings/verify-and-confirm`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            scheduleId: activeSeatModalSchedule.id,
+            boardingPoint:
+              `${passengerModalData.boardingPoint.locationName} ` +
+              `(${passengerModalData.boardingPoint.time})`,
+            droppingPoint:
+              `${passengerModalData.droppingPoint.locationName} ` +
+              `(${passengerModalData.droppingPoint.time})`,
+            passengers: razorpayModalData.passengers,
+            couponCode: razorpayModalData.couponCode,
+            paymentId: paymentDetails.paymentId,
+            orderId: paymentDetails.orderId,
+            signature: paymentDetails.signature,
+            sessionId,
+            userEmail: razorpayModalData.customerEmail,
+            userName: razorpayModalData.passengers[0]?.name,
+            userPhone: razorpayModalData.customerPhone,
+          }),
+        }
+      );
 
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.error || 'Payment verification failed on server', 'error');
-        setRazorpayModalData(null);
+      const responseText = await response.text();
+      let data: any = {};
+
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        throw new Error(
+          `Backend returned an invalid response (${response.status}).`
+        );
+      }
+
+      if (!response.ok) {
+        showToast(
+          data.error ||
+            data.message ||
+            `Payment verification failed (${response.status}).`,
+          'error'
+        );
         return;
       }
 
-      // Close intermediate modals and show confirmed ticket
+      if (!data.booking) {
+        showToast(
+          'Server did not return a confirmed booking. Please verify booking status.',
+          'error'
+        );
+        return;
+      }
+
       setRazorpayModalData(null);
       setPassengerModalData(null);
       setActiveSeatModalSchedule(null);
       setTicketSuccessBooking(data.booking);
-      showToast('Booking Confirmed! E-Ticket generated with PNR: ' + data.pnr);
-      handleSearchBuses(); // Refresh seat counts
-    } catch {
-      showToast('Network error verifying booking confirmation', 'error');
+
+      showToast(
+        data.pnr
+          ? `Booking confirmed! PNR: ${data.pnr}`
+          : 'Booking confirmed successfully!'
+      );
+
+      void handleSearchBuses();
+    } catch (error) {
+      console.error('BMB payment verification error:', error);
+
+      showToast(
+        error instanceof Error
+          ? error.message
+          : 'Network error verifying booking confirmation.',
+        'error'
+      );
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 font-sans text-slate-900 selection:bg-orange-500 selection:text-white">
-      
-      {/* Toast Notification Banner */}
+
+      {/* Toast notification */}
       {toastMessage && (
         <div
-          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border text-xs font-semibold flex items-center gap-2 animate-bounce ${
+          role="status"
+          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border text-xs font-semibold flex items-center gap-2 ${
             toastMessage.type === 'success'
               ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
               : 'bg-red-50 text-red-900 border-red-200'
@@ -207,19 +353,27 @@ function AppContent() {
             <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
           )}
           <span>{toastMessage.text}</span>
+          <button
+            type="button"
+            aria-label="Dismiss notification"
+            className="ml-2"
+            onClick={() => setToastMessage(null)}
+          >
+            ×
+          </button>
         </div>
       )}
 
-      {/* Global Navigation Bar */}
+      {/* Navigation */}
       <Navbar
         currentTab={currentTab}
         setCurrentTab={setCurrentTab}
         openAuthModal={() => setAuthModalOpen(true)}
       />
 
-      {/* View Routing */}
+      {/* Main views */}
       <main className="flex-1">
-        {currentTab === 'home' && (
+        {(currentTab === 'home' || currentTab === 'routes') && (
           <div>
             <HeroSearch
               fromCity={fromCity}
@@ -241,30 +395,12 @@ function AppContent() {
               onSelectSeats={handleSelectSeats}
               onTrackBus={handleTrackBus}
             />
-          </div>
-        )}
 
-        {currentTab === 'routes' && (
-          <div>
-            <HeroSearch
-              fromCity={fromCity}
-              setFromCity={setFromCity}
-              toCity={toCity}
-              setToCity={setToCity}
-              journeyDate={journeyDate}
-              setJourneyDate={setJourneyDate}
-              passengerCount={passengerCount}
-              setPassengerCount={setPassengerCount}
-              onSearch={handleSearchBuses}
-            />
-            <BusResults
-              schedules={schedules}
-              fromCity={fromCity}
-              toCity={toCity}
-              journeyDate={journeyDate}
-              onSelectSeats={handleSelectSeats}
-              onTrackBus={handleTrackBus}
-            />
+            {loadingBuses && (
+              <div className="text-center py-4 text-slate-500" role="status">
+                Searching for buses...
+              </div>
+            )}
           </div>
         )}
 
@@ -278,7 +414,7 @@ function AppContent() {
         {currentTab === 'offers' && (
           <OffersView
             onApplyOffer={code => {
-              showToast(`Coupon code ${code} copied!`);
+              showToast(`Coupon code ${code} selected.`);
             }}
           />
         )}
@@ -288,7 +424,9 @@ function AppContent() {
         {currentTab === 'my-bookings' && (
           <MyBookingsView
             onTrackBus={handleTrackBus}
-            onOpenCancellationModal={booking => setCancellationBooking(booking)}
+            onOpenCancellationModal={booking =>
+              setCancellationBooking(booking)
+            }
             onNavigateHome={() => setCurrentTab('home')}
           />
         )}
@@ -296,7 +434,7 @@ function AppContent() {
         {currentTab === 'admin' && <AdminDashboard />}
       </main>
 
-      {/* Modal 1: Interactive 2D Seat Selection */}
+      {/* Seat selection */}
       {activeSeatModalSchedule && !passengerModalData && (
         <SeatMapModal
           schedule={activeSeatModalSchedule}
@@ -306,38 +444,40 @@ function AppContent() {
         />
       )}
 
-      {/* Modal 2: Passenger Details & Coupon Form */}
-      {activeSeatModalSchedule && passengerModalData && !razorpayModalData && (
-        <PassengerCheckoutModal
-          schedule={activeSeatModalSchedule}
-          selectedSeats={passengerModalData.selectedSeats}
-          boardingPoint={passengerModalData.boardingPoint}
-          droppingPoint={passengerModalData.droppingPoint}
-          totalAmount={passengerModalData.totalAmount}
-          initialEmail={user?.email || 'rahul@example.com'}
-          initialPhone={user?.phone || '9898989898'}
-          onBack={() => setPassengerModalData(null)}
-          onClose={() => {
-            setActiveSeatModalSchedule(null);
-            setPassengerModalData(null);
-          }}
-          onProceedToPayment={handleProceedToPayment}
-        />
-      )}
+      {/* Passenger details */}
+      {activeSeatModalSchedule &&
+        passengerModalData &&
+        !razorpayModalData && (
+          <PassengerCheckoutModal
+            schedule={activeSeatModalSchedule}
+            selectedSeats={passengerModalData.selectedSeats}
+            boardingPoint={passengerModalData.boardingPoint}
+            droppingPoint={passengerModalData.droppingPoint}
+            totalAmount={passengerModalData.totalAmount}
+            initialEmail={user?.email || ''}
+            initialPhone={user?.phone || ''}
+            onBack={() => setPassengerModalData(null)}
+            onClose={() => {
+              setActiveSeatModalSchedule(null);
+              setPassengerModalData(null);
+            }}
+            onProceedToPayment={handleProceedToPayment}
+          />
+        )}
 
-      {/* Modal 3: Razorpay Test Payment Modal */}
+      {/* Razorpay payment */}
       {razorpayModalData && (
         <RazorpayPaymentModal
           amount={razorpayModalData.finalAmount}
           customerEmail={razorpayModalData.customerEmail}
           customerPhone={razorpayModalData.customerPhone}
           onSuccess={handlePaymentSuccess}
-          onFailure={err => showToast(err, 'error')}
+          onFailure={error => showToast(error, 'error')}
           onClose={() => setRazorpayModalData(null)}
         />
       )}
 
-      {/* Modal 4: Confirmed E-Ticket & Vector PDF Download */}
+      {/* Booking confirmation */}
       {ticketSuccessBooking && (
         <TicketSuccessModal
           booking={ticketSuccessBooking}
@@ -350,27 +490,26 @@ function AppContent() {
         />
       )}
 
-      {/* Modal 5: Cancellation & Refund Engine */}
+      {/* Cancellation */}
       {cancellationBooking && (
         <CancellationModal
           booking={cancellationBooking}
           onClose={() => setCancellationBooking(null)}
           onCancellationSuccess={() => {
             setCancellationBooking(null);
-            showToast('Ticket cancelled. Refund initiated.');
-            handleSearchBuses();
+            showToast('Ticket cancelled. Please check refund status.');
+            void handleSearchBuses();
           }}
         />
       )}
 
-      {/* Modal 6: Auth Modal (Login / Register) */}
+      {/* Authentication */}
       {authModalOpen && (
         <AuthModal onClose={() => setAuthModalOpen(false)} />
       )}
 
-      {/* Global Footer */}
+      {/* Footer */}
       <Footer setCurrentTab={setCurrentTab} />
-
     </div>
   );
 }
