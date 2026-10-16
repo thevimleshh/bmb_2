@@ -1,3 +1,4 @@
+
 package com.bmb.controller;
 
 import com.bmb.entity.*;
@@ -22,12 +23,14 @@ public class AdminController {
     private final SeatInventoryRepository seatRepository;
     private final BookingRepository bookingRepository;
 
-    public AdminController(BusRepository busRepository,
-                           ScheduleRepository scheduleRepository,
-                           RouteRepository routeRepository,
-                           BoardingDroppingPointRepository pointRepository,
-                           SeatInventoryRepository seatRepository,
-                           BookingRepository bookingRepository) {
+    public AdminController(
+            BusRepository busRepository,
+            ScheduleRepository scheduleRepository,
+            RouteRepository routeRepository,
+            BoardingDroppingPointRepository pointRepository,
+            SeatInventoryRepository seatRepository,
+            BookingRepository bookingRepository) {
+
         this.busRepository = busRepository;
         this.scheduleRepository = scheduleRepository;
         this.routeRepository = routeRepository;
@@ -36,23 +39,31 @@ public class AdminController {
         this.bookingRepository = bookingRepository;
     }
 
+    // 1. Admin Dashboard Statistics
     @GetMapping("/stats")
     public ResponseEntity<?> getStats() {
+
         long totalBuses = busRepository.count();
         long totalRoutes = scheduleRepository.count();
+
         List<Booking> allBookings = bookingRepository.findAll();
+
         long totalBookings = allBookings.size();
+
         long activeBookings = allBookings.stream()
-                .filter(b -> b.getBookingStatus() == Booking.BookingStatus.CONFIRMED)
+                .filter(b -> b.getBookingStatus()
+                        == Booking.BookingStatus.CONFIRMED)
                 .count();
 
         BigDecimal totalRevenue = allBookings.stream()
-                .filter(b -> b.getBookingStatus() == Booking.BookingStatus.CONFIRMED)
+                .filter(b -> b.getBookingStatus()
+                        == Booking.BookingStatus.CONFIRMED)
                 .map(Booking::getFinalAmount)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Map<String, Object> stats = new HashMap<>();
+
         stats.put("totalBuses", totalBuses);
         stats.put("totalRoutes", totalRoutes);
         stats.put("totalBookings", totalBookings);
@@ -63,41 +74,94 @@ public class AdminController {
         return ResponseEntity.ok(stats);
     }
 
+    // 2. Get All Bookings
     @GetMapping("/bookings")
     public ResponseEntity<List<Booking>> getAllBookings() {
         return ResponseEntity.ok(bookingRepository.findAll());
     }
 
+    // 3. Get All Bus Schedules
     @GetMapping("/buses")
     public ResponseEntity<?> getAllBusesAndSchedules() {
+
         List<Schedule> schedules = scheduleRepository.findAll();
         List<Map<String, Object>> result = new ArrayList<>();
 
         for (Schedule s : schedules) {
+
             Map<String, Object> item = new HashMap<>();
+
             item.put("id", s.getId());
-            item.put("busId", s.getBus() != null ? s.getBus().getId() : null);
+            item.put("busId",
+                    s.getBus() != null ? s.getBus().getId() : null);
             item.put("bus", s.getBus());
-            item.put("fromCity", s.getRoute() != null ? s.getRoute().getFromCity() : "");
-            item.put("toCity", s.getRoute() != null ? s.getRoute().getToCity() : "");
-            item.put("distanceKm", s.getRoute() != null ? s.getRoute().getDistanceKm() : 0);
-            item.put("durationHours", s.getRoute() != null ? s.getRoute().getEstimatedDurationHours() : 0);
-            item.put("departureTime", s.getDepartureTime() != null ? s.getDepartureTime().toString() : "");
-            item.put("arrivalTime", s.getArrivalTime() != null ? s.getArrivalTime().toString() : "");
-            item.put("journeyDate", s.getJourneyDate() != null ? s.getJourneyDate().toString() : "");
+
+            item.put("fromCity",
+                    s.getRoute() != null
+                            ? s.getRoute().getFromCity() : "");
+
+            item.put("toCity",
+                    s.getRoute() != null
+                            ? s.getRoute().getToCity() : "");
+
+            item.put("distanceKm",
+                    s.getRoute() != null
+                            ? s.getRoute().getDistanceKm() : 0);
+
+            item.put("durationHours",
+                    s.getRoute() != null
+                            ? s.getRoute().getEstimatedDurationHours() : 0);
+
+            item.put("departureTime",
+                    s.getDepartureTime() != null
+                            ? s.getDepartureTime().toString() : "");
+
+            item.put("arrivalTime",
+                    s.getArrivalTime() != null
+                            ? s.getArrivalTime().toString() : "");
+
+            item.put("journeyDate",
+                    s.getJourneyDate() != null
+                            ? s.getJourneyDate().toString() : "");
+
             item.put("basePrice", s.getBasePrice());
 
-            var seats = seatRepository.findByScheduleIdOrderBySeatNumberAsc(s.getId());
-            long available = seats.stream().filter(st -> st.getStatus() == SeatInventory.SeatStatus.AVAILABLE).count();
-            long booked = seats.stream().filter(st -> st.getStatus() == SeatInventory.SeatStatus.BOOKED).count();
+            var seats =
+                    seatRepository.findByScheduleIdOrderBySeatNumberAsc(
+                            s.getId());
 
-            item.put("totalSeats", s.getBus() != null ? s.getBus().getTotalSeats() : seats.size());
+            long available = seats.stream()
+                    .filter(st -> st.getStatus()
+                            == SeatInventory.SeatStatus.AVAILABLE)
+                    .count();
+
+            long booked = seats.stream()
+                    .filter(st -> st.getStatus()
+                            == SeatInventory.SeatStatus.BOOKED)
+                    .count();
+
+            item.put("totalSeats",
+                    s.getBus() != null
+                            ? s.getBus().getTotalSeats() : seats.size());
+
             item.put("availableSeats", available);
             item.put("bookedSeats", booked);
 
-            var points = pointRepository.findByScheduleIdOrderByScheduledTimeAsc(s.getId());
-            item.put("boardingPoints", points.stream().filter(p -> p.getPointType() == BoardingDroppingPoint.PointType.BOARDING).toList());
-            item.put("droppingPoints", points.stream().filter(p -> p.getPointType() == BoardingDroppingPoint.PointType.DROPPING).toList());
+            var points =
+                    pointRepository.findByScheduleIdOrderByScheduledTimeAsc(
+                            s.getId());
+
+            item.put("boardingPoints",
+                    points.stream()
+                            .filter(p -> p.getPointType()
+                                    == BoardingDroppingPoint.PointType.BOARDING)
+                            .toList());
+
+            item.put("droppingPoints",
+                    points.stream()
+                            .filter(p -> p.getPointType()
+                                    == BoardingDroppingPoint.PointType.DROPPING)
+                            .toList());
 
             result.add(item);
         }
@@ -105,106 +169,219 @@ public class AdminController {
         return ResponseEntity.ok(result);
     }
 
+    // 4. Add Bus and Create Schedule
     @PostMapping("/buses")
-    public ResponseEntity<?> addBusAndSchedule(@RequestBody Map<String, Object> body) {
-        String busNumber = (String) body.get("busNumber");
-        String operatorName = (String) body.get("operatorName");
-        String fromCity = (String) body.get("fromCity");
-        String toCity = (String) body.get("toCity");
+    public ResponseEntity<?> addBusAndSchedule(
+            @RequestBody Map<String, Object> body) {
 
-        if (busNumber == null || operatorName == null || fromCity == null || toCity == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "busNumber, operatorName, fromCity and toCity are required"));
+        String busNumber =
+                body.get("busNumber") != null
+                        ? body.get("busNumber").toString().trim().toUpperCase()
+                        : null;
+
+        String operatorName =
+                body.get("operatorName") != null
+                        ? body.get("operatorName").toString().trim()
+                        : null;
+
+        String fromCity =
+                body.get("fromCity") != null
+                        ? body.get("fromCity").toString().trim()
+                        : null;
+
+        String toCity =
+                body.get("toCity") != null
+                        ? body.get("toCity").toString().trim()
+                        : null;
+
+        if (busNumber == null || busNumber.isBlank()
+                || operatorName == null || operatorName.isBlank()
+                || fromCity == null || fromCity.isBlank()
+                || toCity == null || toCity.isBlank()) {
+
+            return ResponseEntity.badRequest().body(
+                    Map.of("error",
+                            "busNumber, operatorName, fromCity and toCity are required"));
         }
 
-        // 1. Create or find Bus
-        Bus bus = busRepository.findByBusNumber(busNumber.trim().toUpperCase()).orElse(null);
+        // Create or find Bus
+        Bus bus = busRepository
+                .findByBusNumber(busNumber)
+                .orElse(null);
+
         if (bus == null) {
+
             bus = new Bus();
-            bus.setBusNumber(busNumber.trim().toUpperCase());
-            bus.setOperatorName(operatorName.trim());
-            bus.setBusType(body.get("busType") != null ? Bus.BusType.valueOf((String) body.get("busType")) : Bus.BusType.AC_SLEEPER_2_1);
-            bus.setTotalSeats(body.get("totalSeats") != null ? ((Number) body.get("totalSeats")).intValue() : 30);
+
+            bus.setBusNumber(busNumber);
+            bus.setOperatorName(operatorName);
+
+            // Bus.busType is String, not Bus.BusType enum
+            String busType = body.get("busType") != null
+                    ? body.get("busType").toString()
+                    : "AC_SLEEPER_2_1";
+
+            bus.setBusType(busType);
+
+            int requestedSeats = body.get("totalSeats") != null
+                    ? ((Number) body.get("totalSeats")).intValue()
+                    : 30;
+
+            if (requestedSeats < 1) {
+                return ResponseEntity.badRequest().body(
+                        Map.of("error", "totalSeats must be greater than zero"));
+            }
+
+            bus.setTotalSeats(requestedSeats);
+
             bus.setHasWifi(Boolean.TRUE.equals(body.get("hasWifi")));
             bus.setHasCharging(Boolean.TRUE.equals(body.get("hasCharging")));
             bus.setHasBlanket(Boolean.TRUE.equals(body.get("hasBlanket")));
             bus.setHasWaterBottle(Boolean.TRUE.equals(body.get("hasWaterBottle")));
-            bus.setRating(BigDecimal.valueOf(4.8));
+
+            // Bus.rating is Double
+            bus.setRating(4.8);
+
             bus = busRepository.save(bus);
         }
 
-        // 2. Find or create Route
-        Route route = routeRepository.findByFromCityIgnoreCaseAndToCityIgnoreCase(fromCity.trim(), toCity.trim()).orElse(null);
+        // Find or create Route
+        Route route = routeRepository
+                .findByFromCityIgnoreCaseAndToCityIgnoreCase(
+                        fromCity, toCity)
+                .orElse(null);
+
         if (route == null) {
+
             route = new Route();
-            route.setFromCity(fromCity.trim());
-            route.setToCity(toCity.trim());
-            route.setDistanceKm(body.get("distanceKm") != null ? ((Number) body.get("distanceKm")).intValue() : 350);
-            route.setEstimatedDurationHours(body.get("durationHours") != null ? BigDecimal.valueOf(((Number) body.get("durationHours")).doubleValue()) : BigDecimal.valueOf(6.0));
+
+            route.setFromCity(fromCity);
+            route.setToCity(toCity);
+
+            route.setDistanceKm(
+                    body.get("distanceKm") != null
+                            ? ((Number) body.get("distanceKm")).intValue()
+                            : 350);
+
+            route.setEstimatedDurationHours(
+                    body.get("durationHours") != null
+                            ? BigDecimal.valueOf(
+                                    ((Number) body.get("durationHours")).doubleValue())
+                            : BigDecimal.valueOf(6.0));
+
             route = routeRepository.save(route);
         }
 
-        // 3. Create Schedule
+        // Create Schedule
         Schedule schedule = new Schedule();
+
         schedule.setBus(bus);
         schedule.setRoute(route);
-        schedule.setJourneyDate(body.get("journeyDate") != null ? LocalDate.parse((String) body.get("journeyDate")) : LocalDate.now());
-        schedule.setDepartureTime(LocalTime.of(8, 0));
-        schedule.setArrivalTime(LocalTime.of(14, 0));
-        schedule.setBasePrice(body.get("basePrice") != null ? BigDecimal.valueOf(((Number) body.get("basePrice")).doubleValue()) : BigDecimal.valueOf(750.00));
+
+        schedule.setJourneyDate(
+                body.get("journeyDate") != null
+                        ? LocalDate.parse(body.get("journeyDate").toString())
+                        : LocalDate.now());
+
+        LocalTime departureTime = body.get("departureTime") != null
+                ? LocalTime.parse(body.get("departureTime").toString())
+                : LocalTime.of(8, 0);
+
+        LocalTime arrivalTime = body.get("arrivalTime") != null
+                ? LocalTime.parse(body.get("arrivalTime").toString())
+                : LocalTime.of(14, 0);
+
+        schedule.setDepartureTime(departureTime);
+        schedule.setArrivalTime(arrivalTime);
+
+        // Keep monetary value as BigDecimal
+        BigDecimal basePrice = body.get("basePrice") != null
+                ? new BigDecimal(body.get("basePrice").toString())
+                : BigDecimal.valueOf(750.00);
+
+        if (basePrice.compareTo(BigDecimal.ZERO) < 0) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("error", "basePrice cannot be negative"));
+        }
+
+        schedule.setBasePrice(basePrice);
+
         schedule = scheduleRepository.save(schedule);
 
-        // 4. Initialize Seat Inventory
-        int totalSeats = bus.getTotalSeats() > 0 ? bus.getTotalSeats() : 30;
+        // Initialize Seat Inventory
+        int totalSeats = bus.getTotalSeats() != null
+                && bus.getTotalSeats() > 0
+                ? bus.getTotalSeats()
+                : 30;
+
         int seatsPerDeck = (int) Math.ceil(totalSeats / 2.0);
+
         List<SeatInventory> newSeats = new ArrayList<>();
 
         for (int i = 1; i <= seatsPerDeck; i++) {
+
             SeatInventory lower = new SeatInventory();
+
             lower.setSchedule(schedule);
             lower.setSeatNumber("L" + i);
             lower.setDeck(SeatInventory.Deck.LOWER);
             lower.setSeatType(SeatInventory.SeatType.SLEEPER);
             lower.setIsWindow(i % 3 != 2);
-            lower.setPrice(schedule.getBasePrice());
+            lower.setPrice(basePrice);
             lower.setStatus(SeatInventory.SeatStatus.AVAILABLE);
+
             newSeats.add(lower);
 
-            SeatInventory upper = new SeatInventory();
-            upper.setSchedule(schedule);
-            upper.setSeatNumber("U" + i);
-            upper.setDeck(SeatInventory.Deck.UPPER);
-            upper.setSeatType(SeatInventory.SeatType.SLEEPER);
-            upper.setIsWindow(i % 3 != 2);
-            upper.setPrice(schedule.getBasePrice().add(BigDecimal.valueOf(100)));
-            upper.setStatus(SeatInventory.SeatStatus.AVAILABLE);
-            newSeats.add(upper);
+            // Do not create extra seats beyond requested total
+            if (newSeats.size() < totalSeats) {
+
+                SeatInventory upper = new SeatInventory();
+
+                upper.setSchedule(schedule);
+                upper.setSeatNumber("U" + i);
+                upper.setDeck(SeatInventory.Deck.UPPER);
+                upper.setSeatType(SeatInventory.SeatType.SLEEPER);
+                upper.setIsWindow(i % 3 != 2);
+                upper.setPrice(basePrice.add(BigDecimal.valueOf(100)));
+                upper.setStatus(SeatInventory.SeatStatus.AVAILABLE);
+
+                newSeats.add(upper);
+            }
         }
+
         seatRepository.saveAll(newSeats);
 
-        // 5. Default Boarding and Dropping Points
+        // Default Boarding Point
         BoardingDroppingPoint bp = new BoardingDroppingPoint();
+
         bp.setSchedule(schedule);
         bp.setPointType(BoardingDroppingPoint.PointType.BOARDING);
         bp.setLocationName(fromCity + " Central Bus Terminal");
         bp.setLandmark("Main Departure Bay");
         bp.setAddress(fromCity + " Highway Road");
-        bp.setScheduledTime(schedule.getDepartureTime());
+        bp.setScheduledTime(departureTime);
+
         pointRepository.save(bp);
 
+        // Default Dropping Point
         BoardingDroppingPoint dp = new BoardingDroppingPoint();
+
         dp.setSchedule(schedule);
         dp.setPointType(BoardingDroppingPoint.PointType.DROPPING);
         dp.setLocationName(toCity + " Arrival Terminal");
         dp.setLandmark("Central Dropping Bay");
         dp.setAddress(toCity + " Central Bypass");
-        dp.setScheduledTime(schedule.getArrivalTime());
+        dp.setScheduledTime(arrivalTime);
+
         pointRepository.save(dp);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                "success", true,
-                "message", "Bus and schedule created successfully",
-                "busId", bus.getId(),
-                "scheduleId", schedule.getId()
-        ));
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                Map.of(
+                        "success", true,
+                        "message", "Bus and schedule created successfully",
+                        "busId", bus.getId(),
+                        "scheduleId", schedule.getId()
+                )
+        );
     }
 }
